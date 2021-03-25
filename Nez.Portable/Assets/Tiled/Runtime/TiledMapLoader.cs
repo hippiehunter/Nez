@@ -36,6 +36,12 @@ namespace Nez.Tiled
 			map.TileWidth = (int)xMap.Attribute("tilewidth");
 			map.TileHeight = (int)xMap.Attribute("tileheight");
 			map.HexSideLength = (int?)xMap.Attribute("hexsidelength");
+			map.Infinite = (((int?)xMap.Attribute("infinite") ?? 0) != 0);
+
+			if(map.Infinite)
+			{
+				(map.Width, map.Height) = ParseLayersForDimensions(xMap);
+			}
 
 			// enum parsing
 			map.Orientation = ParseOrientationType((string)xMap.Attribute("orientation"));
@@ -246,6 +252,18 @@ namespace Nez.Tiled
 			return terrain;
 		}
 
+		public static (int height, int width) ParseLayersForDimensions(XElement xEle)
+		{
+			int height = 0;
+			int width = 0;
+			foreach (var e in xEle.Elements().Where(x => x.Name == "layer"))
+			{
+				width = Math.Max(width, (int)e.Attribute("width"));
+				height = Math.Max(height, (int)e.Attribute("height"));
+			}
+			return (width, height);
+		}
+
 		/// <summary>
 		/// parses all the layers in xEle putting them in the container
 		/// </summary>
@@ -305,6 +323,7 @@ namespace Nez.Tiled
 
 		#endregion
 
+		private static char[] CSVSplit = new char[] { '\n', ',' };
 		public static TmxLayer LoadTmxLayer(this TmxLayer layer, TmxMap map, XElement xLayer, int width, int height)
 		{
 			layer.Map = map;
@@ -324,55 +343,80 @@ namespace Nez.Tiled
 			var encoding = (string)xData.Attribute("encoding");
 
 			layer.Tiles = new TmxLayerTile[width * height];
-			if (encoding == "base64")
-			{
-				var decodedStream = new TmxBase64Data(xData);
-				var stream = decodedStream.Data;
 
-				var index = 0;
-				using (var br = new BinaryReader(stream))
+
+			//xData should just be a string, if not, then its chunked
+			if (xData.HasElements)
+			{
+				foreach(var chunk in xData.Elements("chunk"))
 				{
-					for (var j = 0; j < height; j++)
-					{
-						for (var i = 0; i < width; i++)
-						{
-							var gid = br.ReadUInt32();
-							layer.Tiles[index++] = gid != 0 ? new TmxLayerTile(map, gid, i, j) : null;
-						}
-					}
+					var chunkWidth = (int)chunk.Attribute("width");
+					var chunkHeight = (int)chunk.Attribute("height");
+					var chunkX = (int)chunk.Attribute("x");
+					var chunkY = (int)chunk.Attribute("y");
+					LoadLayerData(layer, map, chunkWidth, chunkHeight, chunkX, chunkY, chunk, encoding);
 				}
 			}
-			else if (encoding == "csv")
+			else
 			{
-				var csvData = xData.Value;
-				int k = 0;
-				foreach (var s in csvData.Split(','))
-				{
-					var gid = uint.Parse(s.Trim());
-					var x = k % width;
-					var y = k / width;
-
-					layer.Tiles[k++] = gid != 0 ? new TmxLayerTile(map, gid, x, y) : null;
-				}
+				LoadLayerData(layer, map, width, height, 0, 0, xData, encoding);
 			}
-			else if (encoding == null)
-			{
-				int k = 0;
-				foreach (var e in xData.Elements("tile"))
-				{
-					var gid = (uint?)e.Attribute("gid") ?? 0;
-
-					var x = k % width;
-					var y = k / width;
-
-					layer.Tiles[k++] = gid != 0 ? new TmxLayerTile(map, gid, x, y) : null;
-				}
-			}
-			else throw new Exception("TmxLayer: Unknown encoding.");
 
 			layer.Properties = TiledMapLoader.ParsePropertyDict(xLayer.Element("properties"));
 
 			return layer;
+
+			static void LoadLayerData(TmxLayer layer, TmxMap map, int width, int height, int startX, int startY, XElement xData, string encoding)
+			{
+				if (encoding == "base64")
+				{
+					var decodedStream = new TmxBase64Data(xData);
+					var stream = decodedStream.Data;
+
+					var index = 0;
+					using (var br = new BinaryReader(stream))
+					{
+						for (var j = 0; j < height; j++)
+						{
+							index = ((startY + j) * layer.Width) + startX;
+							for (var i = 0; i < width; i++)
+							{
+								var gid = br.ReadUInt32();
+								layer.Tiles[index++] = gid != 0 ? new TmxLayerTile(map, gid, i + startX, j + startY) : null;
+							}
+						}
+					}
+				}
+				else if (encoding == "csv")
+				{
+					var csvData = xData.Value;
+					int k = 0;
+					foreach (var s in csvData.Split(CSVSplit, StringSplitOptions.RemoveEmptyEntries))
+					{
+						var gid = uint.Parse(s.Trim());
+						var x = k % width;
+						var y = k / width;
+						k++;
+						var index = ((startY + y) * layer.Width) + (startX + x);
+						layer.Tiles[index] = gid != 0 ? new TmxLayerTile(map, gid, x + startX, y + startY) : null;
+					}
+				}
+				else if (encoding == null)
+				{
+					int k = 0;
+					foreach (var e in xData.Elements("tile"))
+					{
+						var gid = (uint?)e.Attribute("gid") ?? 0;
+
+						var x = k % width;
+						var y = k / width;
+						k++;
+						var index = ((startY + y) * layer.Width) + (startX + x);
+						layer.Tiles[index] = gid != 0 ? new TmxLayerTile(map, gid, x + startX, y + startY) : null;
+					}
+				}
+				else throw new Exception("TmxLayer: Unknown encoding.");
+			}
 		}
 
 		public static TmxObjectGroup LoadTmxObjectGroup(this TmxObjectGroup group, TmxMap map, XElement xObjectGroup)

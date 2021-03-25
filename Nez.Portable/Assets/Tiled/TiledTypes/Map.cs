@@ -15,7 +15,8 @@ namespace Nez.Tiled
         public int TileWidth;
         public int TileHeight;
         public int? HexSideLength;
-        public OrientationType Orientation;
+		public bool Infinite;
+		public OrientationType Orientation;
         public StaggerAxisType StaggerAxis;
         public StaggerIndexType StaggerIndex;
         public RenderOrderType RenderOrder;
