@@ -627,7 +627,7 @@ namespace Nez.Tiled
 
 			// cache our source rects for each tile so we dont have to calculate them every time we render. If we have
 			// an image this is a normal tileset, else its an image tileset
-			tileset.TileRegions = new Dictionary<int, RectangleF>();
+			tileset.TileRegions = new Dictionary<int, Rectangle>();
 			if (tileset.Image != null)
 			{
 				var id = firstGid;
@@ -636,7 +636,7 @@ namespace Nez.Tiled
 					var column = 0;
 					for (var x = tileset.Margin; x < tileset.Image.Width - tileset.Margin; x += tileset.TileWidth + tileset.Spacing)
 					{
-						tileset.TileRegions.Add(id++, new RectangleF(x, y, tileset.TileWidth, tileset.TileHeight));
+						tileset.TileRegions.Add(id++, new Rectangle(x, y, tileset.TileWidth, tileset.TileHeight));
 
 						if (++column >= tileset.Columns)
 							break;
@@ -646,7 +646,7 @@ namespace Nez.Tiled
 			else
 			{
 				foreach (var tile in tileset.Tiles.Values)
-					tileset.TileRegions.Add(firstGid + tile.Id, new RectangleF(0, 0, tile.Image.Width, tile.Image.Height));
+					tileset.TileRegions.Add(firstGid + tile.Id, new Rectangle(0, 0, tile.Image.Width, tile.Image.Height));
 			}
 
 			return tileset;

@@ -1,3 +1,4 @@
+using Microsoft.Xna.Framework;
 using System.Collections.Generic;
 
 namespace Nez.Tiled
@@ -23,7 +24,7 @@ namespace Nez.Tiled
 		/// <summary>
 		/// cache of the source rectangles for each tile
 		/// </summary>
-		public Dictionary<int, RectangleF> TileRegions;
+		public Dictionary<int, Rectangle> TileRegions;
 
 		public void Update()
 		{
